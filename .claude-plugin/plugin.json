@@ -2,5 +2,6 @@
   "name": "session-handoff",
   "version": "0.1.0",
   "description": "Band above the prompt with a session timer, a handoff writer and a fresh-start button that loads the handoff",
+  "author": { "name": "Dan Mills", "url": "https://github.com/ptsnac" },
   "types": "./types/index.d.ts"
 }

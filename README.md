@@ -40,21 +40,29 @@ confirm the next step before changing anything.
 
 ## Install
 
-Clone the repo somewhere permanent:
+Pick a permanent folder for the mod and clone it there. Set
+`SESSION_HANDOFF_DIR` to wherever you keep your code:
 
 ```sh
-git clone https://github.com/ptsnac/claude-session-handoff.git ~/Documents/CODE/claude-session-handoff
+SESSION_HANDOFF_DIR="$HOME/code/claude-session-handoff"
+git clone https://github.com/ptsnac/claude-session-handoff.git "$SESSION_HANDOFF_DIR"
 ```
 
 Then load it in one of two ways.
 
 **Every session** - add the folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env`
-block of `~/.claude/settings.json` (an absolute path; `~` is allowed):
+block of `~/.claude/settings.json`. It takes an absolute path or one starting
+with `~`, but not `$HOME` or other variables, so print the line to paste from
+the same shell:
+
+```sh
+echo "\"CLAUDE_CODE_PLUGIN_DIRS\": \"$SESSION_HANDOFF_DIR\""
+```
 
 ```json
 {
   "env": {
-    "CLAUDE_CODE_PLUGIN_DIRS": "~/Documents/CODE/claude-session-handoff"
+    "CLAUDE_CODE_PLUGIN_DIRS": "<the path printed above>"
   }
 }
 ```
@@ -64,7 +72,7 @@ Separate several folders with `:` on macOS and Linux.
 **One session** - pass the folder when starting Claude Code:
 
 ```sh
-claude --plugin-dir ~/Documents/CODE/claude-session-handoff
+claude --plugin-dir "$SESSION_HANDOFF_DIR"
 ```
 
 ## Use

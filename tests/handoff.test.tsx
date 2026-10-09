@@ -25,10 +25,17 @@ const world = (
   const files = new Map<string, string>()
   const ran: string[] = []
   const submitted: string[] = []
+  const forks = { count: 0 }
+  const toasts: string[] = []
 
   const clock = mock.clock(on, { now: 1_000_000 })
   mock.env(on, { HOME: '/home/me' })
   on('session.start', () => ({ cwd: '/work/proj' }))
+  on('session.end', (_$, e) => ({ sessionId: e.sessionId }))
+  on('ui.toast', (_$, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
   on('session.usage', () => ({
     value: {
       startedAt: 1_000_000,
@@ -49,7 +56,10 @@ const world = (
       isStderrTruncated: false,
     },
   }))
-  on('model.fork', () => ({ value: { ...fork, usage: USAGE } }))
+  on('model.fork', () => {
+    forks.count += 1
+    return { value: { ...fork, usage: USAGE } }
+  })
   on('fs.write', (_$, e) => {
     files.set(e.path, e.text)
     return { value: undefined }
@@ -64,7 +74,7 @@ const world = (
     return { text: e.text }
   })
 
-  return { clock, files, ran, submitted }
+  return { clock, files, forks, ran, submitted, toasts }
 }
 
 test('the band counts session time and runs the handoff to a fresh start', async ($, on) => {
@@ -82,7 +92,8 @@ test('the band counts session time and runs the handoff to a fresh start', async
   const path = [...files.keys()][0]
   expect(path).toMatch(/^\/home\/me\/\.claude\/handoffs\/-work-proj\/.*-abcdef12\.md$/)
   const written = files.get(path ?? '') ?? ''
-  expect(written).toContain(`claude --resume ${SESSION_ID}`)
+  expect(written).toMatch(/^---\ngenerated: "/)
+  expect(written).toContain(`resume: "claude --resume ${SESSION_ID}"`)
   expect(written).toContain('# Handoff: test work')
   expect(written).toContain('## Git snapshot')
 
@@ -92,7 +103,11 @@ test('the band counts session time and runs the handoff to a fresh start', async
   expect(ran).toEqual(['clear'])
   expect(submitted).toHaveLength(1)
   expect(submitted[0]).toContain('# Handoff: test work')
+
+  // The engine ends the session on /clear; that resets the row.
+  await $.session.end({ reason: 'clear', sessionId: SESSION_ID, resume: { id: SESSION_ID } })
   expect(await ui.find({ key: 'create' })).toBeDefined()
+  expect(await ui.find({ key: 'fresh' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -105,5 +120,28 @@ test('a session with nothing to fork reports it and offers a retry', async ($, o
 
   expect(await ui.find({ type: 'Text', text: /nothing to hand off yet/ })).toBeDefined()
   expect(await ui.find({ key: 'retry' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a press and /handoff arriving together share one fork', async ($, on) => {
+  const { files, forks, toasts } = world(on)
+  await $.session.start({ cwd: '/work/proj', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ plugin: 'session-handoff', surface: 'terminal', ...BAND })
+  const [command] = await Promise.all([
+    $.command.run({
+      command: 'handoff',
+      args: '',
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: false, columns: 120 },
+    }),
+    ui.press({ key: 'create' }),
+  ])
+
+  expect(forks.count).toBe(1)
+  expect(files.size).toBe(1)
+  expect(toasts).toHaveLength(1)
+  expect(command.text).toContain('Handoff saved to /home/me/.claude/handoffs/')
+  expect(await ui.find({ key: 'regenerate' })).toBeDefined()
   await ui.unmount()
 })

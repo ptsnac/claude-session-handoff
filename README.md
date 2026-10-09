@@ -24,7 +24,7 @@ misses is gone. This mod leaves the conversation alone and instead:
    open questions, next steps and how to verify.
 2. Appends a real `git status`, diff stat and recent log, captured by the mod
    rather than recalled by the model.
-3. Saves it as a Markdown file, headed with the old session's ID and the
+3. Saves it as a Markdown file whose YAML front matter records the old session's ID and the
    `claude --resume <id>` command, so the full transcript is always one step
    away if the handoff missed something.
 
@@ -115,6 +115,13 @@ hot-reloads the mod in the running session.
 
 | File | Role |
 | --- | --- |
-| `hooks/register.tsx` | The mod: timer, handoff writer, fresh start, `/handoff` command and the row's UI |
-| `types/index.d.ts` | Types for the session state the row draws from |
-| `tests/handoff.test.tsx` | Tests for the timer, handoff and fresh-start flow |
+| `hooks/register.tsx` | Everything that calls Claude Code: the hooks, the handoff state machine, writing the file, fresh start and the row's UI |
+| `hooks/prompts.ts` | The handoff prompt and the fresh-start message. Edit here to change what a handoff contains |
+| `hooks/document.ts` | Pure helpers that build the handoff file: path, YAML front matter, git snapshot section |
+| `hooks/time.ts` | Time formatting |
+| `types/index.d.ts` | The handoff state the row draws from |
+| `tests/handoff.test.tsx` | Tests for the timer, handoff, fresh start, failure and concurrent requests |
+
+The engine only follows `$` (the mod's handle on Claude Code) within a single
+file, so every call through it stays in `register.tsx`; the other modules are
+plain functions.

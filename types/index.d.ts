@@ -1,17 +1,15 @@
-export type Clock = {
-  startedAt: number
-  now: number
-  contextPercent: number | null
-}
+export type WrittenHandoff = { path: string; sessionId: string; at: number }
 
 export type Handoff =
   | { phase: 'idle' }
   | { phase: 'working'; since: number }
-  | { phase: 'ready'; path: string; sessionId: string; at: number }
+  | ({ phase: 'ready' } & WrittenHandoff)
   | { phase: 'failed'; reason: string }
+
+export type SettledHandoff = Extract<Handoff, { phase: 'ready' | 'failed' }>
 
 declare module 'claude-code' {
   interface PluginState {
-    'session-handoff': { clock: Clock | null; handoff: Handoff }
+    'session-handoff': { handoff: Handoff }
   }
 }

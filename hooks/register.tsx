@@ -189,7 +189,7 @@ export const register: Register = on => {
     const { Box, Button, Text } = $.ui.resolve(e)
 
     return (
-      <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
+      <Box flexDirection="row" flexWrap="wrap" columnGap={2} marginTop={1}>
         <Text>
           <Text dimColor>session </Text>
           <Text bold>{formatElapsed(now - usage.startedAt)}</Text>

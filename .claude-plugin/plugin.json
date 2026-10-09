@@ -1,0 +1,6 @@
+{
+  "name": "session-handoff",
+  "version": "0.1.0",
+  "description": "Band above the prompt with a session timer, a handoff writer and a fresh-start button that loads the handoff",
+  "types": "./types/index.d.ts"
+}

@@ -9,6 +9,14 @@ export const formatElapsed = (ms: number) => {
   return h > 0 ? `${h}h ${pad(m)}m ${pad(s)}s` : `${m}m ${pad(s)}s`
 }
 
+// Where the band is redrawn once a minute, the timer shows whole minutes.
+export const formatMinutes = (ms: number) => {
+  const total = Math.max(0, Math.floor(ms / 60_000))
+  const h = Math.floor(total / 60)
+
+  return h > 0 ? `${h}h ${pad(total % 60)}m` : `${total}m`
+}
+
 export const formatAge = (ms: number) => {
   const minutes = Math.floor(ms / 60_000)
 

@@ -31,6 +31,8 @@ const world = (
   const clock = mock.clock(on, { now: 1_000_000 })
   mock.env(on, { HOME: '/home/me' })
   on('session.start', () => ({ cwd: '/work/proj' }))
+  // The band draws over what is beneath it; here that is empty.
+  on('ui.render', { component: 'AbovePrompt' }, (b, e) => b.ui.resolve(e).Box({}))
   on('session.end', (_$, e) => ({ sessionId: e.sessionId }))
   on('ui.toast', (_$, e) => {
     toasts.push(e.text)
@@ -83,7 +85,10 @@ test('the band counts session time and runs the handoff to a fresh start', async
   await clock.advance(83_000)
 
   const ui = await $.ui.mount({ plugin: 'session-handoff', surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /1m 23s/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /1m 23s/, in: 'elapsed' })).toBeDefined()
+  // The timer ticks on the surface's clock, with no redraw of the band.
+  await ui.advance(2000)
+  expect(await ui.find({ type: 'Text', text: /1m 25s/, in: 'elapsed' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /context 42%/ })).toBeDefined()
   expect(await ui.find({ key: 'fresh' })).toBeUndefined()
 
@@ -143,5 +148,15 @@ test('a press and /handoff arriving together share one fork', async ($, on) => {
   expect(toasts).toHaveLength(1)
   expect(command.text).toContain('Handoff saved to /home/me/.claude/handoffs/')
   expect(await ui.find({ key: 'regenerate' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the band is not redrawn every second, so what else animates in it runs on', async ($, on) => {
+  const { clock } = world(on)
+  await $.session.start({ cwd: '/work/proj', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'session-handoff', surface: 'desktop', ...BAND })
+  const first = JSON.stringify(await ui.drawn())
+  await clock.advance(5000)
+  expect(JSON.stringify(await ui.drawn())).toBe(first)
   await ui.unmount()
 })

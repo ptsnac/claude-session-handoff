@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Handoff, SettledHandoff, WrittenHandoff } from '../types'
 import { GIT_COMMANDS, formatGitSnapshot, handoffDocument, handoffPath } from './document'
 import { freshStartPrompt, handoffPrompt } from './prompts'
-import { formatAge, formatElapsed } from './time'
+import { formatAge, formatElapsed, formatMinutes } from './time'
 
 const handoff = atom({ plugin: 'session-handoff', key: 'handoff' } as const, {
   phase: 'idle',
@@ -160,7 +160,16 @@ export const register: Register = on => {
       name: 'handoff',
       description: 'Write a handoff for a fresh context window (session-handoff mod)',
     })
-    $.clock.every(1000, () => $.ui.invalidate('ui.render'))
+    // The session's seconds tick in the band's own Client, so the band is
+    // redrawn once a minute (a handoff's age, the timer where no Client
+    // draws), or each second while a handoff is being written.
+    let seconds = 0
+    $.clock.every(1000, async () => {
+      seconds += 1
+      if (seconds % 60 === 0 || (await read($, handoff)).phase === 'working') {
+        $.ui.invalidate('ui.render')
+      }
+    })
 
     return started
   })
@@ -180,41 +189,54 @@ export const register: Register = on => {
       return next(e)
     }
 
-    const [usage, now, state] = await Promise.all([
+    // What other plugins draw in the band goes first, so this row shares the
+    // band instead of replacing theirs.
+    const [usage, now, state, below] = await Promise.all([
       $.session.usage(),
       $.clock.now(),
       read($, handoff),
+      next(e),
     ])
     const { status, action } = view(state, now)
     const { Box, Button, Text } = $.ui.resolve(e)
+    let timer = (
+      <Text>
+        <Text dimColor>session </Text>
+        <Text bold>{formatMinutes(now - usage.startedAt)}</Text>
+      </Text>
+    )
+    if (e.surface === 'terminal' || e.surface === 'desktop') {
+      const { Client } = $.ui.resolve(e)
+      timer = <Client key="elapsed" module="./elapsed.tsx" props={{ startedAt: usage.startedAt, now }} />
+    }
 
     return (
-      <Box flexDirection="row" flexWrap="wrap" columnGap={2} marginTop={1}>
-        <Text>
-          <Text dimColor>session </Text>
-          <Text bold>{formatElapsed(now - usage.startedAt)}</Text>
-        </Text>
-        {usage.context.percent !== undefined && (
-          <Text dimColor>context {usage.context.percent}%</Text>
-        )}
-        {status && <Text color={status.color}>{status.text}</Text>}
-        {state.phase === 'ready' && (
-          <Button
-            key="fresh"
-            label="Start fresh with handoff"
-            hotkey="n"
-            variant="primary"
-            onPress={() => void startFresh($)}
-          />
-        )}
-        {action && (
-          <Button
-            key={action.key}
-            label={action.label}
-            hotkey="h"
-            onPress={() => void createHandoff($)}
-          />
-        )}
+      <Box flexDirection="column">
+        {below}
+        <Box flexDirection="row" flexWrap="wrap" columnGap={2} marginTop={1}>
+          {timer}
+          {usage.context.percent !== undefined && (
+            <Text dimColor>context {usage.context.percent}%</Text>
+          )}
+          {status && <Text color={status.color}>{status.text}</Text>}
+          {state.phase === 'ready' && (
+            <Button
+              key="fresh"
+              label="Start fresh with handoff"
+              hotkey="n"
+              variant="primary"
+              onPress={() => void startFresh($)}
+            />
+          )}
+          {action && (
+            <Button
+              key={action.key}
+              label={action.label}
+              hotkey="h"
+              onPress={() => void createHandoff($)}
+            />
+          )}
+        </Box>
       </Box>
     )
   })
